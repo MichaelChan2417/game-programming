@@ -6,6 +6,15 @@
 #include <vector>
 #include <deque>
 
+enum ObjectType {
+	PLAYER
+};
+
+struct Object {
+	ObjectType type_;
+	
+};
+
 struct PlayMode : Mode {
 	PlayMode();
 	virtual ~PlayMode();
