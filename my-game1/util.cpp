@@ -39,16 +39,15 @@ void write_chunk(const std::string &filename,
   }
 
   // then for each tile, write the index
-  std::array<uint8_t, 8> bit0s;
-  std::array<uint8_t, 8> bit1s;
+  std::array<uint8_t, 8> bit0s = {0};
+  std::array<uint8_t, 8> bit1s = {0};
 
   for (uint32_t i = 0; i < color_indexs.size(); i++) {
     uint32_t index = color_indexs[i];
     uint32_t bit0 = index & 0x1;
     uint32_t bit1 = (index >> 1) & 0x1;
-
-    bit0s[i % 8] |= bit0 << (i / 8);
-    bit1s[i % 8] |= bit1 << (i / 8);
+    bit0s[i / 8] |= bit0 << (i % 8);
+    bit1s[i / 8] |= bit1 << (i % 8);
   }
 
   for (uint32_t i = 0; i < 8; i++) {
@@ -95,4 +94,19 @@ void read_chunk(const std::string &filename, std::array<uint8_t, 8> &bit0s,
   for (uint32_t i = 0; i < 8; i++) {
     in.read(reinterpret_cast<char *>(&bit1s[i]), sizeof(uint8_t));
   }
+}
+
+PPU466::Tile mirror_tile(PPU466::Tile &tile) {
+  PPU466::Tile mirror;
+  for (uint32_t i = 0; i < 8; i++) {
+    mirror.bit0[i] = 0;
+    mirror.bit1[i] = 0;
+    for (uint32_t j = 0; j < 8; j++) {
+      uint8_t bit0 = (tile.bit0[i] >> j) & 0x1;
+      uint8_t bit1 = (tile.bit1[i] >> j) & 0x1;
+      mirror.bit0[i] |= bit0 << (7 - j);
+      mirror.bit1[i] |= bit1 << (7 - j);
+    }
+  }
+  return mirror;
 }

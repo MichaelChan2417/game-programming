@@ -1,12 +1,13 @@
 #include "PlayMode.hpp"
 
 #include <cstdint>
-#include <random>
 
 // for the GL_ERRORS() macro:
+#include "PPU466.hpp"
 #include "gl_errors.hpp"
 
 #include "load_asset.hpp"
+#include "load_save_png.hpp"
 #include "util.hpp"
 
 // for glm::value_ptr() :
@@ -56,6 +57,9 @@ PlayMode::PlayMode() {
   // parse & load sprites
   parse_sprite();
   load_sprites();
+
+  // deal with background
+  parse_and_load_background();
 }
 
 PlayMode::~PlayMode() {}
@@ -81,37 +85,27 @@ void PlayMode::update(float elapsed) {
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
   //--- set ppu state based on game state ---
 
-  // tilemap gets recomputed every frame as some weird plasma thing:
-  // NOTE: don't do this in your game! actually make a map or something :-)
-  for (uint32_t y = 0; y < PPU466::BackgroundHeight; ++y) {
-    for (uint32_t x = 0; x < PPU466::BackgroundWidth; ++x) {
-      // TODO: make weird plasma thing
-      ppu.background[x + PPU466::BackgroundWidth * y] = 1;
-    }
-  }
-
-  // background scroll:
-  // ppu.background_position.x = int32_t(-0.5f * player_at.x);
-  // ppu.background_position.y = int32_t(-0.5f * player_at.y);
+  // background scroll: NO scroll in this game
 
   // player sprite:
   ppu.sprites[0].x = int8_t(player_at.x);
   ppu.sprites[0].y = int8_t(player_at.y);
-  ppu.sprites[0].index = 0;
-  ppu.sprites[0].attributes = 0;
+  ppu.sprites[0].index = 4;
+  ppu.sprites[0].attributes = 4;
+  ppu.sprites[1].x = int8_t(player_at.x + 8);
+  ppu.sprites[1].y = int8_t(player_at.y);
+  ppu.sprites[1].index = 5;
+  ppu.sprites[1].attributes = 4;
+  ppu.sprites[2].x = int8_t(player_at.x);
+  ppu.sprites[2].y = int8_t(player_at.y + 8);
+  ppu.sprites[2].index = 6;
+  ppu.sprites[2].attributes = 5;
+  ppu.sprites[3].x = int8_t(player_at.x + 8);
+  ppu.sprites[3].y = int8_t(player_at.y + 8);
+  ppu.sprites[3].index = 7;
+  ppu.sprites[3].attributes = 5;
 
-  // some other misc sprites:
-  // for (uint32_t i = 1; i < 63; ++i) {
-  // 	float amt = (i + 2.0f * background_fade) / 62.0f;
-  // 	ppu.sprites[i].x = int8_t(0.5f * PPU466::ScreenWidth + std::cos( 2.0f *
-  // M_PI * amt * 5.0f + 0.01f * player_at.x) * 0.4f * PPU466::ScreenWidth);
-  // 	ppu.sprites[i].y = int8_t(0.5f * PPU466::ScreenHeight + std::sin( 2.0f *
-  // M_PI * amt * 3.0f + 0.01f * player_at.y) * 0.4f * PPU466::ScreenWidth);
-  // 	ppu.sprites[i].index = 32;
-  // 	ppu.sprites[i].attributes = 6;
-  // 	if (i % 2) ppu.sprites[i].attributes |= 0x80; //'behind' bit
-  // }
-  for (uint32_t i = 1; i < 63; i++) {
+  for (uint32_t i = 4; i < 63; i++) {
     ppu.sprites[i].x = 15;
     ppu.sprites[i].y = 240;
     ppu.sprites[i].index = 1;
@@ -120,6 +114,41 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 
   //--- actually draw ---
   ppu.draw(drawable_size);
+}
+
+void PlayMode::parse_and_load_background() {
+  glm::uvec2 image_size = glm::uvec2(0, 0);
+  std::vector<glm::u8vec4> data;
+
+  try {
+    load_png("../assets/background.png", &image_size, &data, LowerLeftOrigin);
+  } catch (const std::exception &ex) {
+    std::cerr << "Error loading background png " << ex.what() << std::endl;
+    wait_and_exit();
+  }
+
+  // size should be 32x30
+  if (image_size.x != 32 || image_size.y != 30) {
+    wait_and_exit("Background size is not 32x30");
+  }
+
+  for (uint32_t i = 0; i < 30; i++) {
+    for (uint32_t j = 0; j < 32; j++) {
+      uint32_t index = i * 32 + j;
+      uint32_t bindex = i * PPU466::BackgroundWidth + j;
+      // get b color
+      uint8_t b = data[index].b;
+      if (b == 36) {
+        ppu.background[bindex] = (0 << 8) | 0;
+      } else if (b == 0) {
+        ppu.background[bindex] = (1 << 8) | 1;
+      } else if (b == 153) {
+        ppu.background[bindex] = (2 << 8) | 2;
+      } else if (b == 239) {
+        ppu.background[bindex] = (3 << 8) | 3;
+      }
+    }
+  }
 }
 
 void PlayMode::load_sprites() {
@@ -137,6 +166,9 @@ void PlayMode::load_sprites() {
       tile.bit1[y] = bit1s[y];
     }
     ppu.tile_table[sprite_index++] = tile;
+    if (i == PLAYER_BODY || i == PLAYER_HEAD) {
+      ppu.tile_table[sprite_index++] = mirror_tile(tile);
+    }
 
     // store the palette
     std::array<glm::u8vec4, 4> palette;
@@ -146,7 +178,7 @@ void PlayMode::load_sprites() {
     ppu.palette_table[i] = palette;
 
     // print color infos
-    std::cout << "Sprite " << i << " loading ";
+    std::cout << "Pallete " << i << " loading ";
     for (uint32_t j = 0; j < 4; j++) {
       std::cout << "colors " << j << ": " << int(colors[j].r) << ","
                 << int(colors[j].g) << "," << int(colors[j].b) << ","

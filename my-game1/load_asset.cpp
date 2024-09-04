@@ -65,28 +65,7 @@ void parse_sprite() {
       }
     }
 
+    assert(color_indexs.size() == 64);
     write_chunk(sprite_files[i], color_indexs, colors);
-  }
-}
-
-void load_player() {
-
-  glm::uvec2 image_size = glm::uvec2(0, 0);
-  std::vector<glm::u8vec4> data;
-
-  try {
-    load_png("../assets/player.png", &image_size, &data, LowerLeftOrigin);
-  } catch (const std::exception &ex) {
-    std::cerr << "Error loading player png " << ex.what() << std::endl;
-  }
-
-  std::cout << "Player loaded" << std::endl;
-  std::cout << "Size: " << image_size.x << " " << image_size.y << std::endl;
-  std::cout << "Data size: " << data.size() << std::endl;
-  // print all pixels with int cast
-  for (int i = 0; i < data.size(); i++) {
-    std::cout << "Pixel " << i << ": " << (int)data[i].r << " "
-              << (int)data[i].g << " " << (int)data[i].b << " "
-              << (int)data[i].a << std::endl;
   }
 }

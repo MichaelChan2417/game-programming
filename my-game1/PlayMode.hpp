@@ -14,6 +14,7 @@ struct PlayMode : Mode {
   virtual ~PlayMode();
 
   void load_sprites();
+  void parse_and_load_background();
 
   // functions called by main loop:
   virtual bool handle_event(SDL_Event const &,
