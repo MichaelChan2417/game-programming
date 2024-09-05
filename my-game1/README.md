@@ -1,8 +1,8 @@
-# (TODO: your game's title)
+# Dark Escape
 
-Author: (TODO: your name)
+Author: Shengjian Chen
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: Walking in the dark, you can only see close things. Can you find way out?
 
 Screen Shot:
 
@@ -10,13 +10,15 @@ Screen Shot:
 
 How Your Asset Pipeline Works:
 
-(TODO: describe the steps in your asset pipeline, from source files to tiles/backgrounds/whatever you upload to the PPU466.)
+There are 2 art work under `assets/`. One is background.png which denotes the map. Currently, it only support 32*30 size which means the map cannot scroll. Another is sprite.png, which should be an 8 x 8(x N) size big image, where each 8x8 is a tile. Each tile cannot have more than 3 (could be 4, but for true NES) unique colors.
 
-(TODO: make sure the source files you drew are included. You can [link](your/file.png) to them to be a bit fancier.)
+Then `parse_sprite()` would read the image, load each 8x8 tile and write them to a local binary file. Each file starts with a magic name first (4 char) then follows 4 color infos. If it has less then 4 colors, pending with zero. Lastly, it concat with the pattern of tile. Directly store bit0s and bit1s.
+
+After parse, PlayMode would read the binary and load them into sprite & pallete, also setup map.
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+Use directional key to control player to move up/down/left/right. You cannot pass the wall. Try to find the red flag to escape. (Though currently nothing will happen if you find red flag :< )
 
 This game was built with [NEST](NEST.md).
 
