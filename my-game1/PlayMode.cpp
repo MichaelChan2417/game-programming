@@ -60,21 +60,40 @@ PlayMode::PlayMode() {
 
   // deal with background
   parse_and_load_background();
+
+  player_at.x = 125.0f;
+  player_at.y = 120.0f;
 }
 
 PlayMode::~PlayMode() {}
 
 void PlayMode::update(float elapsed) {
   constexpr float PlayerSpeed = 30.0f;
-  if (left.pressed)
-    player_at.x -= PlayerSpeed * elapsed;
-  if (right.pressed)
-    player_at.x += PlayerSpeed * elapsed;
-  if (down.pressed)
-    player_at.y -= PlayerSpeed * elapsed;
-  if (up.pressed)
-    player_at.y += PlayerSpeed * elapsed;
+  glm::vec2 cur_pos = player_at;
 
+  if (left.pressed)
+    cur_pos.x -= PlayerSpeed * elapsed;
+  if (right.pressed)
+    cur_pos.x += PlayerSpeed * elapsed;
+
+  uint32_t x = uint32_t(cur_pos.x / 8);
+  uint32_t y = uint32_t(cur_pos.y / 8);
+  if (backgrounds_[x][y] != 1 || backgrounds_[x + 2][y] != 1 || backgrounds_[x][y + 1] != 1 || backgrounds_[x + 2][y + 1] != 1) {
+    cur_pos.x = player_at.x;
+  }
+
+  if (down.pressed)
+    cur_pos.y -= PlayerSpeed * elapsed;
+  if (up.pressed)
+    cur_pos.y += PlayerSpeed * elapsed;
+
+  x = uint32_t(cur_pos.x / 8);
+  y = uint32_t(cur_pos.y / 8);
+  if (backgrounds_[x][y] != 1 || backgrounds_[x + 2][y] != 1 || backgrounds_[x][y + 1] != 1 || backgrounds_[x + 2][y + 1] != 1) {
+    cur_pos.y = player_at.y;
+  }
+
+  player_at = cur_pos;
   // reset button press counters:
   left.downs = 0;
   right.downs = 0;
@@ -86,6 +105,22 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
   //--- set ppu state based on game state ---
 
   // background scroll: NO scroll in this game
+
+  // background mask: only background close to player is visible
+  uint32_t x = uint32_t(player_at.x / 8) + 1;
+  uint32_t y = uint32_t(player_at.y / 8) + 1;
+  for (uint32_t i = 0; i < 30; i++) {
+    for (uint32_t j = 0; j < 32; j++) {
+      int distance = (int32_t(i) - int32_t(y)) * (int32_t(i) - int32_t(y)) +
+                     (int32_t(j) - int32_t(x)) * (int32_t(j) - int32_t(x));
+        uint32_t bindex = i * PPU466::BackgroundWidth + j;
+      if (distance > 15 ) {
+        ppu.background[bindex] = (1 << 8) | 1;    // make everything black
+      } else {
+        ppu.background[bindex] = default_background_[i * 32 + j];
+      }
+    }
+  }
 
   // player sprite:
   ppu.sprites[0].x = int8_t(player_at.x);
@@ -146,9 +181,13 @@ void PlayMode::parse_and_load_background() {
         ppu.background[bindex] = (2 << 8) | 2;
       } else if (b == 239) {
         ppu.background[bindex] = (3 << 8) | 3;
+        backgrounds_[j][i] = 1;
       }
+
+      default_background_[i * 32 + j] = ppu.background[bindex];
     }
   }
+  
 }
 
 void PlayMode::load_sprites() {

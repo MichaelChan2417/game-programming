@@ -1,7 +1,10 @@
-#include "Mode.hpp"
-#include "PPU466.hpp"
+#include <cstdint>
+#include <vector>
 
 #include <glm/glm.hpp>
+
+#include "Mode.hpp"
+#include "PPU466.hpp"
 
 enum ObjectType { PLAYER };
 
@@ -23,6 +26,7 @@ struct PlayMode : Mode {
   virtual void draw(glm::uvec2 const &drawable_size) override;
 
   //----- game state -----
+  std::array<uint16_t, 32 * 30> default_background_;
 
   // input tracking:
   struct Button {
@@ -35,6 +39,7 @@ struct PlayMode : Mode {
 
   // player position:
   glm::vec2 player_at = glm::vec2(0.0f);
+  std::vector<std::vector<uint8_t>> backgrounds_{32, std::vector<uint8_t>(30, 0)};
 
   //----- drawing handled by PPU466 -----
 
