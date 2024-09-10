@@ -143,7 +143,7 @@ struct Scene {
   void draw(Camera const &camera) const;
 
   //..sometimes, you want to draw with a custom projection matrix and/or light
-  //space:
+  // space:
   void draw(glm::mat4 const &world_to_clip,
             glm::mat4x3 const &world_to_light = glm::mat4x3(1.0f)) const;
 
@@ -173,7 +173,7 @@ struct Scene {
   Scene(Scene const &);            //...as a constructor
   Scene &operator=(Scene const &); //...as scene = scene
   //... as a set() function that optionally returns the transform->transform
-  //mapping:
+  // mapping:
   void set(Scene const &,
            std::unordered_map<Transform const *, Transform *> *transform_map =
                nullptr);
