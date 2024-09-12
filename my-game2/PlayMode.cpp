@@ -7,21 +7,32 @@
 #include "Mesh.hpp"
 #include "data_path.hpp"
 #include "gl_errors.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/trigonometric.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 
+// LOADING MESHES
 GLuint hexapod_meshes_for_lit_color_texture_program = 0;
 Load<MeshBuffer> hexapod_meshes(LoadTagDefault, []() -> MeshBuffer const * {
-  MeshBuffer const *ret = new MeshBuffer(data_path("cube.pnct"));
+  MeshBuffer const *ret = new MeshBuffer(data_path("hcube.pnct"));
   hexapod_meshes_for_lit_color_texture_program =
       ret->make_vao_for_program(lit_color_texture_program->program);
   return ret;
 });
+GLuint enemy_meshes_for_lit_color_texture_program = 1;
+Load<MeshBuffer> enemy_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+  MeshBuffer const *ret = new MeshBuffer(data_path("enemy.pnct"));
+  enemy_meshes_for_lit_color_texture_program =
+      ret->make_vao_for_program(lit_color_texture_program->program);
+  return ret;
+});
 
+// LOADING SCENES
 Load<Scene> hexapod_scene(LoadTagDefault, []() -> Scene const * {
-  return new Scene(data_path("cube.scene"), [&](Scene &scene,
-                                                Scene::Transform *transform,
-                                                std::string const &mesh_name) {
+  return new Scene(data_path("hcube.scene"), [&](Scene &scene,
+                                                 Scene::Transform *transform,
+                                                 std::string const &mesh_name) {
     Mesh const &mesh = hexapod_meshes->lookup(mesh_name);
 
     scene.drawables.emplace_back(transform);
@@ -35,6 +46,22 @@ Load<Scene> hexapod_scene(LoadTagDefault, []() -> Scene const * {
     drawable.pipeline.count = mesh.count;
   });
 });
+Load<Scene> enemy_scene(LoadTagDefault, []() -> Scene const * {
+  return new Scene(data_path("enemy.scene"), [&](Scene &scene,
+                                                 Scene::Transform *transform,
+                                                 std::string const &mesh_name) {
+    Mesh const &mesh = enemy_meshes->lookup(mesh_name);
+    scene.drawables.emplace_back(transform);
+    Scene::Drawable &drawable = scene.drawables.back();
+
+    drawable.pipeline = lit_color_texture_program_pipeline;
+
+    drawable.pipeline.vao = enemy_meshes_for_lit_color_texture_program;
+    drawable.pipeline.type = mesh.type;
+    drawable.pipeline.start = mesh.start;
+    drawable.pipeline.count = mesh.count;
+  });
+});
 
 PlayMode::PlayMode() : scene(*hexapod_scene) {
   // get pointer to camera for convenience:
@@ -43,6 +70,11 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
         "Expecting scene to have exactly one camera, but it has " +
         std::to_string(scene.cameras.size()));
   camera = &scene.cameras.front();
+
+  // add enemy
+  for (const Scene::Drawable &d : enemy_scene->drawables) {
+    scene.drawables.push_back(d);
+  }
 }
 
 PlayMode::~PlayMode() {}
@@ -90,15 +122,30 @@ bool PlayMode::handle_event(SDL_Event const &evt,
       SDL_SetRelativeMouseMode(SDL_TRUE);
       return true;
     }
+    mouse.pressed = true;
   } else if (evt.type == SDL_MOUSEMOTION) {
     if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
       glm::vec2 motion = glm::vec2(evt.motion.xrel / float(window_size.y),
-                                   -evt.motion.yrel / float(window_size.y));
-      camera->transform->rotation = glm::normalize(
-          camera->transform->rotation *
-          glm::angleAxis(-motion.x * camera->fovy,
-                         glm::vec3(0.0f, 1.0f, 0.0f)) *
-          glm::angleAxis(motion.y * camera->fovy, glm::vec3(1.0f, 0.0f, 0.0f)));
+                                   evt.motion.yrel / float(window_size.y));
+
+      camera->yaw += motion.x * camera->fovy;
+      camera->pitch += motion.y * camera->fovy;
+      // camera pitch should be limited to (-pi/2, pi/2)
+      camera->pitch =
+          glm::clamp(camera->pitch, -glm::pi<float>() / 2.0f + 0.0001f,
+                     glm::pi<float>() / 2.0f - 0.0001f);
+
+      // use it to get the new rotation, first by having lookAt
+      glm::vec3 lookAt =
+          glm::vec3(sin(camera->yaw) * cos(camera->pitch),
+                    cos(camera->yaw) * cos(camera->pitch), sin(camera->pitch));
+      glm::vec3 lookRight =
+          glm::normalize(glm::vec3(-lookAt.y, lookAt.x, 0.0f));
+      glm::vec3 lookUp = glm::cross(lookAt, lookRight);
+
+      glm::mat3 rotationMatrix(lookRight, lookUp, lookAt);
+      camera->transform->rotation = glm::quat_cast(rotationMatrix);
+
       return true;
     }
   }
@@ -113,6 +160,8 @@ void PlayMode::update(float elapsed) {
 
     // combine inputs into a move:
     constexpr float PlayerSpeed = 30.0f;
+    constexpr float EnemySpeed = 20.0f;
+    constexpr float ShootbackSpeed = 480.0f;
     glm::vec2 move = glm::vec2(0.0f);
     if (left.pressed && !right.pressed)
       move.x = -1.0f;
@@ -128,19 +177,43 @@ void PlayMode::update(float elapsed) {
       move = glm::normalize(move) * PlayerSpeed * elapsed;
 
     glm::mat4x3 frame = camera->transform->make_local_to_parent();
-    glm::vec3 frame_right = frame[0];
-    // glm::vec3 up = frame[1];
-    // glm::vec3 frame_forward = -frame[2];
+    glm::vec3 fright = frame[0];
+    glm::vec3 fup = frame[1];
+    glm::vec3 forward = -frame[2];
+
     glm::vec3 global_up = glm::vec3(0.0f, 0.0f, 1.0f);
-    glm::vec3 frame_forward = glm::cross(global_up, frame_right);
+    glm::vec3 frame_forward = glm::cross(global_up, fright);
 
-    camera->transform->position +=
-        move.x * frame_right + move.y * frame_forward;
+    glm::vec3 cur_pos = camera->transform->position;
 
-    // print position
-    std::cout << "Position: " << camera->transform->position.x << " "
-              << camera->transform->position.y << " "
-              << camera->transform->position.z << std::endl;
+    camera->transform->position += move.x * fright + move.y * frame_forward;
+    // position's X and Y should be limited to (-100, 100)
+    camera->transform->position.x =
+        glm::clamp(camera->transform->position.x, -100.0f, 100.0f);
+    camera->transform->position.y =
+        glm::clamp(camera->transform->position.y, -100.0f, 100.0f);
+
+    // move enemy
+    glm::vec3 cur_enemy_pos = scene.drawables[enemy_index].transform->position;
+    glm::vec3 enemy_dir = glm::normalize(cur_pos - cur_enemy_pos);
+    scene.drawables[enemy_index].transform->position +=
+        EnemySpeed * elapsed * enemy_dir;
+
+    // check shoot angle difference, by checking -enemy_dir.xy and forward.xy
+    glm::vec3 enemy_dir_xy =
+        glm::normalize(glm::vec3(-enemy_dir.x, -enemy_dir.y, 0.0f));
+    glm::vec3 forward_xy =
+        glm::normalize(glm::vec3(forward.x, forward.y, 0.0f));
+    float angle_diff = glm::acos(glm::dot(enemy_dir_xy, forward_xy));
+    if (mouse.pressed) {
+      // shoot
+      if (angle_diff < glm::radians(30.0f)) {
+        std::cout << "Hit" << std::endl;
+        scene.drawables[enemy_index].transform->position -=
+            ShootbackSpeed * elapsed * enemy_dir;
+      }
+    }
+    mouse.pressed = false;
   }
 
   // reset button press counters:

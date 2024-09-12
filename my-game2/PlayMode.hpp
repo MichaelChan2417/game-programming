@@ -1,8 +1,9 @@
 #include "Mode.hpp"
 
-#include "Scene.hpp"
-
 #include <glm/glm.hpp>
+#include <vector>
+
+#include "Scene.hpp"
 
 struct PlayMode : Mode {
   PlayMode();
@@ -20,11 +21,13 @@ struct PlayMode : Mode {
   struct Button {
     uint8_t downs = 0;
     uint8_t pressed = 0;
-  } left, right, down, up;
+  } left, right, down, up, mouse;
 
   // local copy of the game scene (so code can change it during gameplay):
   Scene scene;
 
   // camera:
   Scene::Camera *camera = nullptr;
+
+  int enemy_index = 11;
 };

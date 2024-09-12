@@ -106,6 +106,10 @@ struct Scene {
     float fovy = glm::radians(60.0f); // vertical fov (in radians)
     float aspect = 1.0f;              // x / y
     float near = 0.01f;               // near plane
+
+    float yaw = 0.0f;   // yaw of the camera (used for some effects)
+    float pitch = 0.0f; // pitch of the camera (used for some effects)
+
     // computed from the above:
     glm::mat4 make_projection() const;
   };
@@ -134,7 +138,7 @@ struct Scene {
 
   // Scenes, of course, may have many of the above objects:
   std::list<Transform> transforms;
-  std::list<Drawable> drawables;
+  std::vector<Drawable> drawables;
   std::list<Camera> cameras;
   std::list<Light> lights;
 
