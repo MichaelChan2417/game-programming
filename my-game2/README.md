@@ -1,8 +1,8 @@
-# (TODO: your game's title)
+# 1-on-1 BOSS
 
-Author: (TODO: your name)
+Author: Shengjian Chen
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: Fight boss in a cage, 1 on 1. You can use your gun to shoot
 
 Screen Shot:
 
@@ -10,6 +10,6 @@ Screen Shot:
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+use W/A/S/D to control movement of character and press left botton to shoot. Target BOSS, you can see if you hit in terminal
 
 This game was built with [NEST](NEST.md).
